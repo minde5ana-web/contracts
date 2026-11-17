@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ka"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ხელშეკრულების გენერატორი</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.4/dist/pizzip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.47.4/build/docxtemplater.js"></script>
+<style>
+:root{--bg:#f4f2ee;--card:#fff;--ink:#2b2f2c;--mut:#7a7f78;--line:#e2dfd8;--acc:#5f7a6a;--acc2:#4c6556}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 'Noto Sans Georgian',system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:28px 16px 60px}h1{font-size:22px;margin:0 0 4px}.sub{color:var(--mut);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--acc);margin:0 0 12px}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:600px){.g{grid-template-columns:1fr}}
+label{display:block;font-size:13px;color:var(--mut)}input,select{width:100%;margin-top:4px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;color:var(--ink);background:#fcfbf9}
+input:focus,select:focus{outline:2px solid #b9c9bf;border-color:var(--acc)}.full{grid-column:1/-1}
+summary{cursor:pointer;font-weight:600;color:var(--acc)}details .g{margin-top:12px}
+.words{font-size:13px;color:var(--mut);margin-top:10px}.words b{color:var(--ink);font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+button{width:100%;padding:14px;border:0;border-radius:10px;background:var(--acc);color:#fff;font:600 16px inherit;font-family:inherit;cursor:pointer}button:hover{background:var(--acc2)}
+#msg{margin-top:12px;font-size:14px;min-height:20px}.err{color:#a5483a}.ok{color:var(--acc2)}.hide{display:none}
+</style></head><body><main>
+<h1>ხელშეკრულების გენერატორი</h1><p class="sub">შეავსე ველები და ჩამოტვირთე მზა Word ფაილი. მონაცემები არსად იგზავნება.</p>
+
+<div class="card"><h2>ხელშეკრულება</h2><div class="g">
+<label>ტიპი<select id="type"><option value="preliminary">წინარე ნასყიდობა</option><option value="full">სრული ნასყიდობა</option></select></label>
+<label>ენა<select id="lang"><option value="ka">ქართული</option><option value="ru">რუსული</option><option value="en">ინგლისური</option></select></label>
+<label>თარიღი<input type="date" id="date"></label>
+<label class="pre">ხელშეკრულების №<input id="contract_no"></label></div></div>
+
+<div class="card"><h2>მყიდველი</h2><div class="g">
+<label class="full">სახელი, გვარი<input id="buyer_name"></label>
+<label>პირადი ნომერი<input id="buyer_pn" inputmode="numeric"></label>
+<label>მოქალაქეობა<input id="buyer_citizenship" value="საქართველო"></label>
+<label class="full">მისამართი<input id="buyer_address" placeholder="ქ. თბილისი, ..."></label>
+<label>ტელეფონი<input id="buyer_phone" type="tel"></label>
+<label>ელ. ფოსტა<input id="buyer_email" type="email"></label></div></div>
+
+<div class="card"><h2>ბინა და ფასი</h2><div class="g">
+<label>სართული<input id="floor"></label><label>ბინის №<input id="apt"></label>
+<label>საერთო ფართი (კვ.მ)<input id="area" type="number" step="0.01" min="0"></label>
+<label>საკადასტრო კოდი (ბინის)<input id="cadastral" placeholder="20.42.04.812.01.01"></label>
+<label>1 კვ.მ-ის ფასი (აშშ დოლარი)<input id="price_sqm" type="number" step="0.01" min="0"></label>
+<label>საერთო ღირებულება (აშშ დოლარი)<input id="price_total" type="number" step="0.01" min="0"></label></div>
+<p class="words" id="pw"></p></div>
+
+<div class="card pre"><h2>გადახდის გრაფიკი (დანართი 2)</h2><div class="g">
+<label>პირველადი შენატანი (აშშ დოლარი)<input id="init" type="number" step="0.01" min="0"></label>
+<label>ვადა (თვე)<input id="months" type="number" min="1" step="1"></label>
+<label>ბინის რემონტისთვის მომზადების ვადა<input id="handover" type="date" value="2027-04-01"></label></div>
+<table id="sch" class="hide"><thead><tr><th>№</th><th>თარიღი</th><th>თანხა (USD)</th></tr></thead><tbody></tbody></table></div>
+
+<div class="card"><details><summary>გამყიდველი (წინასწარ შევსებულია, საჭიროებისას შეცვალე)</summary><div class="g">
+<label>დირექტორი / ხელმომწერი<input id="seller_director" value="მინდია ხინიკაძე"></label>
+<label>პირადი ნომერი<input id="seller_pn" value="61004010194"></label>
+<label class="full">ოფისის მისამართი<input id="seller_address" value="საქართველო, ქ. ქობულეთი, მეგობრობის ქუჩა #18-20"></label>
+<label>ელ. ფოსტა<input id="seller_email" value="info@renegroup.ge"></label>
+<label>ტელეფონი<input id="seller_phone" value="+995 593 14-01-01"></label>
+<label class="full">ანგარიშის № (IBAN)<input id="seller_iban" value="GE05TB7452036080100005"></label></div></details></div>
+
+<button id="go">გენერირება და ჩამოტვირთვა</button><div id="msg"></div>
+</main>
+<script>
+const $=id=>document.getElementById(id),V=id=>$(id).value.trim();
+const KU=["","ერთი","ორი","სამი","ოთხი","ხუთი","ექვსი","შვიდი","რვა","ცხრა","ათი","თერთმეტი","თორმეტი","ცამეტი","თოთხმეტი","თხუთმეტი","თექვსმეტი","ჩვიდმეტი","თვრამეტი","ცხრამეტი"],KT={20:"ოც",40:"ორმოც",60:"სამოც",80:"ოთხმოც"},KH=["","ას","ორას","სამას","ოთხას","ხუთას","ექვსას","შვიდას","რვაას","ცხრაას"];
+const RU=["","один","два","три","четыре","пять","шесть","семь","восемь","девять","десять","одиннадцать","двенадцать","тринадцать","четырнадцать","пятнадцать","шестнадцать","семнадцать","восемнадцать","девятнадцать"],RT=["","","двадцать","тридцать","сорок","пятьдесят","шестьдесят","семьдесят","восемьдесят","девяносто"],RH=["","сто","двести","триста","четыреста","пятьсот","шестьсот","семьсот","восемьсот","девятьсот"];
+const EU=RU.map((_,i)=>["","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen"][i]),ET=["","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"];
+function ka(n){const b=x=>{if(x<20)return KU[x];const t=x-x%20,r=x%20;return r?KT[t]+"და"+KU[r]:KT[t]+"ი"};
+ const h=x=>{const c=(x/100)|0,r=x%100;return(c?(r?KH[c]+" ":KH[c]+"ი"):"")+(r?b(r):"")};
+ const m=(n/1e6)|0,th=((n%1e6)/1e3)|0,r=n%1e3,o=[];
+ if(m)o.push(h(m)+((th||r)?" მილიონ":" მილიონი"));if(th)o.push((th===1?"ერთი":h(th))+(r?" ათას":" ათასი"));if(r)o.push(h(r));return o.join(" ")}
+function en(n){const h=x=>{let s="";if(x>=100){s=EU[(x/100)|0]+" hundred";x%=100;if(x)s+=" "}if(x<20)s+=EU[x];else s+=ET[(x/10)|0]+(x%10?"-"+EU[x%10]:"");return s};
+ const o=[];for(const[v,w]of[[1e6,"million"],[1e3,"thousand"]]){const q=Math.floor(n/v);if(q){o.push(h(q)+" "+w);n%=v}}if(n)o.push(h(n));return o.join(" ")}
+function ru(n){const h=(x,f)=>{const u=RU.slice();if(f){u[1]="одна";u[2]="две"}const s=[RH[(x/100)|0]];x%=100;if(x<20)s.push(u[x]);else s.push(RT[(x/10)|0],u[x%10]);return s.filter(Boolean).join(" ")};
+ const pl=(x,a,b,c)=>{const t=x%100,u=x%10;return t>10&&t<20?c:u===1?a:u>1&&u<5?b:c};
+ const m=(n/1e6)|0,th=((n%1e6)/1e3)|0,r=n%1e3,o=[];
+ if(m)o.push(h(m)+" "+pl(m,"миллион","миллиона","миллионов"));if(th)o.push(h(th,1)+" "+pl(th,"тысяча","тысячи","тысяч"));if(r)o.push(h(r));return o.join(" ")}
+function words(v,l){const i=Math.floor(v+1e-9),c=Math.round((v-i)*100),f={ka,ru,en}[l];let s=i?f(i):{ka:"ნული",ru:"ноль",en:"zero"}[l];
+ if(c)s+={ka:" და "+c+" ცენტი",ru:" и "+c+" центов",en:" and "+c+" cents"}[l];return s}
+const fmt=n=>n.toLocaleString('en-US',{minimumFractionDigits:n%1?2:0,maximumFractionDigits:2});
+const dmy=d=>String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear();
+const pd=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+function addM(d,k){const x=new Date(d.getFullYear(),d.getMonth()+k,1);x.setDate(Math.min(d.getDate(),new Date(x.getFullYear(),x.getMonth()+1,0).getDate()));return x}
+let totalTouched=false;$('date').value=new Date().toISOString().slice(0,10);
+function sched(){const T=Math.round(+$('price_total').value*100),I=Math.round(+$('init').value*100),n=Math.floor(+$('months').value);
+ if(!T||!(n>=1)||$('init').value===''||I<0||I>=T||!V('date'))return null;const d0=pd(V('date')),rest=T-I,base=Math.floor(rest/n),rows=[{n:1,date:dmy(d0),amount:fmt(I/100)}];
+ for(let i=1;i<=n;i++)rows.push({n:i+1,date:dmy(addM(d0,i)),amount:fmt((i===n?rest-base*(n-1):base)/100)});return rows}
+function refresh(){const a=+$('area').value,p=+$('price_sqm').value;if(!totalTouched&&a&&p)$('price_total').value=(Math.round(a*p*100)/100);
+ const l=V('lang'),t=+$('price_total').value;$('pw').innerHTML=p||t?'1 კვ.მ: <b>'+words(p,l)+'</b><br>სულ: <b>'+words(t,l)+'</b>':'';
+ const r=sched(),tb=$('sch');tb.classList.toggle('hide',!r||V('type')!=='preliminary');if(r)tb.tBodies[0].innerHTML=r.map(x=>`<tr><td>${x.n}</td><td>${x.date}</td><td>${x.amount}</td></tr>`).join('')}
+$('price_total').addEventListener('input',()=>{totalTouched=true});
+['area','price_sqm','price_total','init','months','date','lang','type'].forEach(i=>$(i).addEventListener('input',()=>{refresh();if(i==='type')document.querySelectorAll('.pre').forEach(e=>e.classList.toggle('hide',V('type')!=='preliminary'))}));
+const msg=(t,c)=>{$('msg').className=c;$('msg').textContent=t};
+$('go').onclick=async()=>{
+ const pre=V('type')==='preliminary',l=V('lang');
+ const need=['buyer_name','buyer_pn','apt','area','cadastral','price_sqm','price_total'].concat(pre?['init','months']:[]);
+ if(need.some(i=>!V(i)))return msg('გთხოვ, შეავსო ყველა საჭირო ველი (მყიდველის სახელი და პირადი ნომერი, ბინა, ფართი, კადასტრი, ფასი'+(pre?', გრაფიკის ველები':'')+').','err');
+ let rows=null;if(pre){rows=sched();if(!rows)return msg('გადახდის გრაფიკი ვერ დაითვალა: შეამოწმე პირველადი შენატანი (უნდა იყოს ჯამზე ნაკლები) და ვადა.','err')}
+ const tot=+V('price_total'),sq=+V('price_sqm'),o={};
+ ['contract_no','buyer_name','buyer_pn','buyer_citizenship','buyer_address','buyer_phone','buyer_email','floor','apt','cadastral','seller_director','seller_pn','seller_address','seller_email','seller_phone','seller_iban'].forEach(i=>o[i]=V(i));
+ Object.assign(o,{area:fmt(+V('area')),price_sqm:fmt(sq),price_total:fmt(tot),price_sqm_words:words(sq,l),price_total_words:words(tot,l),date:dmy(pd(V('date'))),handover:V('handover')?dmy(pd(V('handover'))):'',schedule:rows||[]});
+ try{const r=await fetch(l+'_'+V('type')+'.docx');if(!r.ok)throw 404;
+  const d=new docxtemplater(new PizZip(await r.arrayBuffer()),{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});d.render(o);
+  const b=d.getZip().generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download=l+'_'+V('type')+'_'+(V('apt')||'x')+'.docx';a.click();msg('მზადაა. ფაილი ჩამოიტვირთა.','ok')}
+ catch(e){msg(e===404?'ამ ენის შაბლონი ჯერ არ არის დამატებული.':'შეცდომა გენერირებისას: '+(e.message||e),'err')}};
+refresh();
+</script></body></html>
