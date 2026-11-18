@@ -48,6 +48,8 @@ button{width:100%;padding:14px;border:0;border-radius:10px;background:var(--acc)
 <label>პირველადი შენატანი: ტიპი<select id="initmode"><option value="usd">თანხა (აშშ დოლარი)</option><option value="pct">პროცენტი (%)</option></select></label>
 <label>პირველადი შენატანი (თანხა ან %)<input id="init" type="number" step="0.01" min="0"></label>
 <label>ვადა (თვე)<input id="months" type="number" min="1" step="1"></label>
+<label>პირველადი შენატანის გადახდის თარიღი<input id="pay1" type="date"></label>
+<label>ყოველთვიური გადახდის რიცხვი (1-31)<input id="payday" type="number" min="1" max="31" step="1"></label>
 </div>
 <table id="sch" class="hide"><thead><tr><th>№</th><th>თარიღი</th><th>თანხა (USD)</th></tr></thead><tbody></tbody></table></div>
 
@@ -83,17 +85,18 @@ const dmy=d=>String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padS
 const pd=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 function addM(d,k){const x=new Date(d.getFullYear(),d.getMonth()+k,1);x.setDate(Math.min(d.getDate(),new Date(x.getFullYear(),x.getMonth()+1,0).getDate()));return x}
 $('date').value=new Date().toISOString().slice(0,10);
+const md=(d,i)=>{const D=Math.floor(+V('payday')),k=(D>d.getDate()?0:1)+i-1,x=new Date(d.getFullYear(),d.getMonth()+k,1);x.setDate(Math.min(D,new Date(x.getFullYear(),x.getMonth()+1,0).getDate()));return x};
 function sched(){const T=Math.round(+$('price_total').value*100),I=V('initmode')==='pct'?Math.round(T*(+$('init').value)/100):Math.round(+$('init').value*100),n=Math.floor(+$('months').value);
- if(!T||!(n>=1)||$('init').value===''||I<0||I>=T||!V('date'))return null;const d0=pd(V('date')),rest=T-I,base=Math.floor(rest/n),rows=[{n:1,date:dmy(d0),amount:fmt(I/100)}];
- for(let i=1;i<=n;i++)rows.push({n:i+1,date:dmy(addM(d0,i)),amount:fmt((i===n?rest-base*(n-1):base)/100)});return rows}
+ if(!T||!(n>=1)||$('init').value===''||I<0||I>=T||!V('pay1')||!(+V('payday')>=1&&+V('payday')<=31))return null;const d0=pd(V('pay1')),rest=T-I,base=Math.floor(rest/n),rows=[{n:1,date:dmy(d0),amount:fmt(I/100)}];
+ for(let i=1;i<=n;i++)rows.push({n:i+1,date:dmy(md(d0,i)),amount:fmt((i===n?rest-base*(n-1):base)/100)});return rows}
 function refresh(){$('cadastral').value=V('apt')?'20.42.04.812.01.01.'+V('apt'):'';const a=+$('area').value,p=+$('price_sqm').value;$('price_total').value=(a&&p)?Math.round(a*p*100)/100:'';
  const l=V('lang'),t=+$('price_total').value;$('pw').innerHTML=p||t?'1 კვ.მ: <b>'+words(p,l)+'</b><br>სულ: <b>'+words(t,l)+'</b>':'';
  const r=sched(),tb=$('sch');tb.classList.toggle('hide',!r||V('type')!=='preliminary');if(r)tb.tBodies[0].innerHTML=r.map(x=>`<tr><td>${x.n}</td><td>${x.date}</td><td>${x.amount}</td></tr>`).join('')}
-['apt','area','price_sqm','price_total','init','initmode','months','date','lang','type'].forEach(i=>$(i).addEventListener('input',()=>{refresh();if(i==='type')document.querySelectorAll('.pre').forEach(e=>e.classList.toggle('hide',V('type')!=='preliminary'))}));
+['pay1','payday','apt','area','price_sqm','price_total','init','initmode','months','date','lang','type'].forEach(i=>$(i).addEventListener('input',()=>{refresh();if(i==='type')document.querySelectorAll('.pre').forEach(e=>e.classList.toggle('hide',V('type')!=='preliminary'))}));
 const msg=(t,c)=>{$('msg').className=c;$('msg').textContent=t};
 $('go').onclick=async()=>{
  const pre=V('type')==='preliminary',l=V('lang');
- const need=['buyer_name','apt','area','cadastral','price_sqm','price_total'].concat(pre?['init','months','contract_no']:[]);
+ const need=['buyer_name','apt','area','cadastral','price_sqm','price_total'].concat(pre?['init','months','contract_no','pay1','payday']:[]);
  if(need.some(i=>!V(i)))return msg('გთხოვ, შეავსო ყველა საჭირო ველი (მყიდველის სახელი და პირადი ნომერი, ბინა, ფართი, კადასტრი, ფასი'+(pre?', გრაფიკის ველები':'')+').','err');
  let rows=null;if(pre){rows=sched();if(!rows)return msg('გადახდის გრაფიკი ვერ დაითვალა: შეამოწმე პირველადი შენატანი (უნდა იყოს ჯამზე ნაკლები) და ვადა.','err')}
  const tot=+V('price_total'),sq=+V('price_sqm'),o={};
@@ -115,5 +118,6 @@ $('buyer_passport').addEventListener('input',chk);
 $('contract_no').addEventListener('input',()=>{touched.no=1;chk()});$('contract_no').addEventListener('blur',()=>{touched.no=1;chk()});
 $('ctype').addEventListener('blur',()=>{touched.ctype=1;chk()});$('type').addEventListener('input',chk);
 $('ctype').addEventListener('input',()=>{touched.ctype=1;$('buyer_pn').maxLength=V('ctype')==='foreign'?30:11;if(V('ctype')!=='foreign')$('buyer_pn').value=V('buyer_pn').replace(/\D/g,'').slice(0,11);chk()});
+let p1t=0;$('pay1').value=$('date').value;$('pay1').addEventListener('input',()=>{p1t=1});$('date').addEventListener('input',()=>{if(!p1t){$('pay1').value=V('date');refresh()}});
 refresh();chk();
 </script></body></html>
