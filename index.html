@@ -15,7 +15,7 @@ label{display:block;font-size:13px;color:var(--mut)}input,select{width:100%;marg
 input:focus,select:focus{outline:2px solid #b9c9bf;border-color:var(--acc)}.full{grid-column:1/-1}
 summary{cursor:pointer;font-weight:600;color:var(--acc)}details .g{margin-top:12px}
 .words{font-size:13px;color:var(--mut);margin-top:10px}.words b{color:var(--ink);font-weight:600}
-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}td input{width:130px;margin:0;padding:4px 6px}input.mod{border-color:var(--acc);font-weight:600}td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
 button{width:100%;padding:14px;border:0;border-radius:10px;background:var(--acc);color:#fff;font:600 16px inherit;font-family:inherit;cursor:pointer}button:hover{background:var(--acc2)}
 #msg{margin-top:12px;font-size:14px;min-height:20px}.err{color:#a5483a}.ok{color:var(--acc2)}.hide{display:none}small{font-size:12px;color:var(--mut)}small.err{display:block;color:#a5483a}input.bad,select.bad{border-color:#c0392b;background:#fdf0ee}button:disabled{opacity:.45;cursor:not-allowed}
 </style></head><body><main>
@@ -48,10 +48,12 @@ button{width:100%;padding:14px;border:0;border-radius:10px;background:var(--acc)
 <label>პირველადი შენატანი: ტიპი<select id="initmode"><option value="usd">თანხა (აშშ დოლარი)</option><option value="pct">პროცენტი (%)</option></select></label>
 <label>პირველადი შენატანი (თანხა ან %)<input id="init" type="number" step="0.01" min="0"></label>
 <label>ვადა (თვე)<input id="months" type="number" min="1" step="1"></label>
+<label>ყოველთვიური გადახდა (არასავალდებულო, აშშ დოლარი)<input id="monthly" type="number" step="0.01" min="0"></label>
 <label>პირველადი შენატანის გადახდის თარიღი<input id="pay1" type="date"></label>
 <label>ყოველთვიური გადახდის რიცხვი (1-31)<input id="payday" type="number" min="1" max="31" step="1"></label>
 </div>
-<table id="sch" class="hide"><thead><tr><th>№</th><th>თარიღი</th><th>თანხა (USD)</th></tr></thead><tbody></tbody></table></div>
+<table id="sch" class="hide"><thead><tr><th>№</th><th>თარიღი</th><th>თანხა (USD)</th></tr></thead><tbody></tbody></table>
+<p><small id="schmsg" class="err"></small> <a href="#" id="rst" class="hide" style="font-size:13px;color:var(--acc)">ხელით შეცვლილი თანხების გაუქმება</a></p></div>
 
 <div class="card"><details><summary>გამყიდველი (წინასწარ შევსებულია, საჭიროებისას შეცვალე)</summary><div class="g">
 <label>დირექტორი / ხელმომწერი<input id="seller_director" value="მინდია ხინიკაძე"></label>
@@ -61,7 +63,7 @@ button{width:100%;padding:14px;border:0;border-radius:10px;background:var(--acc)
 <label>ტელეფონი<input id="seller_phone" value="+995 593 14-01-01"></label>
 <label class="full">ანგარიშის № (IBAN)<input id="seller_iban" value="GE05TB7452036080100005"></label></div></details></div>
 
-<p class="sub" style="text-align:center;margin:0 0 10px">ვერსია: 18.11.2026-v7 (გადახდის თარიღები)</p><button id="go">გენერირება და ჩამოტვირთვა</button><div id="msg"></div>
+<p class="sub" style="text-align:center;margin:0 0 10px">ვერსია: 18.11.2026-v8 (ყოველთვიური თანხა)</p><button id="go">გენერირება და ჩამოტვირთვა</button><div id="msg"></div>
 </main>
 <script>
 const $=id=>document.getElementById(id),V=id=>$(id).value.trim();
@@ -86,19 +88,27 @@ const pd=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 function addM(d,k){const x=new Date(d.getFullYear(),d.getMonth()+k,1);x.setDate(Math.min(d.getDate(),new Date(x.getFullYear(),x.getMonth()+1,0).getDate()));return x}
 $('date').value=new Date().toISOString().slice(0,10);
 const md=(d,i)=>{const D=Math.floor(+V('payday')),k=(D>d.getDate()?0:1)+i-1,x=new Date(d.getFullYear(),d.getMonth()+k,1);x.setDate(Math.min(D,new Date(x.getFullYear(),x.getMonth()+1,0).getDate()));return x};
-function sched(){const T=Math.round(+$('price_total').value*100),I=V('initmode')==='pct'?Math.round(T*(+$('init').value)/100):Math.round(+$('init').value*100),n=Math.floor(+$('months').value);
- if(!T||!(n>=1)||$('init').value===''||I<0||I>=T||!V('pay1')||!(+V('payday')>=1&&+V('payday')<=31))return null;const d0=pd(V('pay1')),rest=T-I,base=Math.floor(rest/n),rows=[{n:1,date:dmy(d0),amount:fmt(I/100)}];
- for(let i=1;i<=n;i++)rows.push({n:i+1,date:dmy(md(d0,i)),amount:fmt((i===n?rest-base*(n-1):base)/100)});return rows}
+const ov={};let ovKey='';
+function sched(){const T=Math.round(+$('price_total').value*100),I=V('initmode')==='pct'?Math.round(T*(+$('init').value)/100):Math.round(+$('init').value*100),n=Math.floor(+$('months').value),M=V('monthly')===''?0:Math.round(+$('monthly').value*100);
+ const key=[T,I,n,M].join();if(key!==ovKey){ovKey=key;for(const k in ov)delete ov[k]}
+ if(!T||!(n>=1)||$('init').value===''||I<0||I>=T||!V('pay1')||!(+V('payday')>=1&&+V('payday')<=31))return null;
+ const d0=pd(V('pay1')),rest=T-I,rows=[{n:1,date:dmy(d0),amount:fmt(I/100)}];let used=0,anyOv=false,err='';
+ for(let i=1;i<=n;i++){let a,m=false;
+  if(i<n&&ov[i]!==undefined){a=ov[i];anyOv=true;m=true}else if(i===n)a=rest-used;else if(M&&!anyOv)a=M;else a=Math.floor((rest-used)/(n-i+1));
+  if(a<0)err='თანხები ჯამში აჭარბებს ნასყიდობის ღირებულებას. შეამოწმე ყოველთვიური თანხა.';
+  used+=a;rows.push({n:i+1,i,date:dmy(md(d0,i)),amount:fmt(a/100),raw:a,mod:m,last:i===n})}
+ return err?{err}:{rows}}
 function refresh(){$('cadastral').value=V('apt')?'20.42.04.812.01.01.'+V('apt'):'';const a=+$('area').value,p=+$('price_sqm').value;$('price_total').value=(a&&p)?Math.round(a*p*100)/100:'';
  const l=V('lang'),t=+$('price_total').value;$('pw').innerHTML=p||t?'1 კვ.მ: <b>'+words(p,l)+'</b><br>სულ: <b>'+words(t,l)+'</b>':'';
- const r=sched(),tb=$('sch');tb.classList.toggle('hide',!r||V('type')!=='preliminary');if(r)tb.tBodies[0].innerHTML=r.map(x=>`<tr><td>${x.n}</td><td>${x.date}</td><td>${x.amount}</td></tr>`).join('')}
-['pay1','payday','apt','area','price_sqm','price_total','init','initmode','months','date','lang','type'].forEach(i=>$(i).addEventListener('input',()=>{refresh();if(i==='type')document.querySelectorAll('.pre').forEach(e=>e.classList.toggle('hide',V('type')!=='preliminary'))}));
+ const sc=sched(),r=sc&&sc.rows,tb=$('sch');$('schmsg').textContent=(sc&&sc.err)||'';tb.classList.toggle('hide',!r||V('type')!=='preliminary');$('rst').classList.toggle('hide',!r||!Object.keys(ov).length);
+ if(r)tb.tBodies[0].innerHTML=r.map(x=>`<tr><td>${x.n}</td><td>${x.date}</td><td>${x.i&&!x.last?`<input type="number" step="0.01" min="0" data-i="${x.i}" value="${x.raw/100}" class="${x.mod?'mod':''}">`:x.amount+(x.last?' <small>(დარჩენილი)</small>':'')}</td></tr>`).join('');chk()}
+['monthly','pay1','payday','apt','area','price_sqm','price_total','init','initmode','months','date','lang','type'].forEach(i=>$(i).addEventListener('input',()=>{refresh();if(i==='type')document.querySelectorAll('.pre').forEach(e=>e.classList.toggle('hide',V('type')!=='preliminary'))}));
 const msg=(t,c)=>{$('msg').className=c;$('msg').textContent=t};
 $('go').onclick=async()=>{
  const pre=V('type')==='preliminary',l=V('lang');
  const need=['buyer_name','apt','area','cadastral','price_sqm','price_total'].concat(pre?['init','months','contract_no','pay1','payday']:[]);
  if(need.some(i=>!V(i)))return msg('გთხოვ, შეავსო ყველა საჭირო ველი (მყიდველის სახელი და პირადი ნომერი, ბინა, ფართი, კადასტრი, ფასი'+(pre?', გრაფიკის ველები':'')+').','err');
- let rows=null;if(pre){rows=sched();if(!rows)return msg('გადახდის გრაფიკი ვერ დაითვალა: შეამოწმე პირველადი შენატანი (უნდა იყოს ჯამზე ნაკლები) და ვადა.','err')}
+ let rows=null;if(pre){const sc=sched();rows=sc&&sc.rows;if(!rows)return msg((sc&&sc.err)||'გადახდის გრაფიკი ვერ დაითვალა: შეამოწმე პირველადი შენატანი (უნდა იყოს ჯამზე ნაკლები) და ვადა.','err')}
  const tot=+V('price_total'),sq=+V('price_sqm'),o={};
  ['contract_no','buyer_name','buyer_pn','buyer_passport','buyer_address','buyer_phone','buyer_email','floor','apt','cadastral','seller_director','seller_pn','seller_address','seller_email','seller_phone','seller_iban'].forEach(i=>o[i]=V(i));
  Object.assign(o,{buyer_citizenship:V('ctype')==='ge'?'საქართველო':'უცხოელი',area:fmt(+V('area')),price_sqm:fmt(sq),price_total:fmt(tot),price_sqm_words:words(sq,l),price_total_words:words(tot,l),date:dmy(pd(V('date'))),schedule:rows||[]});
@@ -110,7 +120,7 @@ $('go').onclick=async()=>{
 const touched={};
 function chk(){const t=V('ctype'),ge=t==='ge',pn=V('buyer_pn'),pre=V('type')==='preliminary',badPn=ge&&pn.length>0&&pn.length!==11;let ok=true;
  if(!t)ok=false;else if(ge){if(pn.length!==11)ok=false}else if(!(pn||V('buyer_passport')))ok=false;
- if(pre&&!V('contract_no'))ok=false;
+ if(pre&&!V('contract_no'))ok=false;if(pre){const q=sched();if(!q||!q.rows)ok=false}
  $('buyer_pn').classList.toggle('bad',badPn);$('pnmsg').textContent=badPn?'პირადი ნომერი უნდა იყოს ზუსტად 11 ციფრი (ჩაწერილია '+pn.length+')':'';
  $('ctype').classList.toggle('bad',!t);$('contract_no').classList.toggle('bad',pre&&!V('contract_no'));$('go').disabled=!ok}
 $('buyer_pn').addEventListener('input',()=>{if(V('ctype')!=='foreign')$('buyer_pn').value=V('buyer_pn').replace(/\D/g,'').slice(0,11);chk()});
@@ -118,6 +128,7 @@ $('buyer_passport').addEventListener('input',chk);
 $('contract_no').addEventListener('input',()=>{touched.no=1;chk()});$('contract_no').addEventListener('blur',()=>{touched.no=1;chk()});
 $('ctype').addEventListener('blur',()=>{touched.ctype=1;chk()});$('type').addEventListener('input',chk);
 $('ctype').addEventListener('input',()=>{touched.ctype=1;$('buyer_pn').maxLength=V('ctype')==='foreign'?30:11;if(V('ctype')!=='foreign')$('buyer_pn').value=V('buyer_pn').replace(/\D/g,'').slice(0,11);chk()});
+$('sch').addEventListener('change',e=>{const i=e.target.dataset.i;if(!i)return;const v=e.target.value;if(v==='')delete ov[i];else ov[i]=Math.round(+v*100);refresh()});$('rst').onclick=e=>{e.preventDefault();for(const k in ov)delete ov[k];refresh()};
 let p1t=0;$('pay1').value=$('date').value;$('pay1').addEventListener('input',()=>{p1t=1});$('date').addEventListener('input',()=>{if(!p1t){$('pay1').value=V('date');refresh()}});
 refresh();chk();
 </script></body></html>
