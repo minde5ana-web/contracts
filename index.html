@@ -17,7 +17,7 @@ summary{cursor:pointer;font-weight:600;color:var(--acc)}details .g{margin-top:12
 .words{font-size:13px;color:var(--mut);margin-top:10px}.words b{color:var(--ink);font-weight:600}
 table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
 button{width:100%;padding:14px;border:0;border-radius:10px;background:var(--acc);color:#fff;font:600 16px inherit;font-family:inherit;cursor:pointer}button:hover{background:var(--acc2)}
-#msg{margin-top:12px;font-size:14px;min-height:20px}.err{color:#a5483a}.ok{color:var(--acc2)}.hide{display:none}small{font-size:12px;color:var(--mut)}small.err{display:block;color:#a5483a}input.bad{border-color:#c0392b;background:#fdf0ee}button:disabled{opacity:.45;cursor:not-allowed}
+#msg{margin-top:12px;font-size:14px;min-height:20px}.err{color:#a5483a}.ok{color:var(--acc2)}.hide{display:none}small{font-size:12px;color:var(--mut)}small.err{display:block;color:#a5483a}input.bad,select.bad{border-color:#c0392b;background:#fdf0ee}button:disabled{opacity:.45;cursor:not-allowed}
 </style></head><body><main>
 <h1>ხელშეკრულების გენერატორი</h1><p class="sub">შეავსე ველები და ჩამოტვირთე მზა Word ფაილი. მონაცემები არსად იგზავნება.</p>
 
@@ -29,8 +29,7 @@ button{width:100%;padding:14px;border:0;border-radius:10px;background:var(--acc)
 
 <div class="card"><h2>მყიდველი</h2><div class="g">
 <label class="full">სახელი, გვარი<input id="buyer_name"></label>
-<label>მოქალაქეობის ტიპი <small>(ხელშეკრულებაში არ გადადის)</small><select id="ctype"><option value="ge">ქართველი</option><option value="foreign">უცხოელი</option></select></label>
-<label>მოქალაქეობა (ხელშეკრულებაში)<input id="buyer_citizenship" value="საქართველო"></label>
+<label>მოქალაქეობა<select id="ctype"><option value="">აირჩიე...</option><option value="ge">ქართველი</option><option value="foreign">უცხოელი</option></select></label>
 <label>პირადი ნომერი<input id="buyer_pn" inputmode="numeric" maxlength="11" autocomplete="off"><small id="pnmsg" class="err"></small></label>
 <label>პასპორტის ნომერი <small>(უცხოელისთვის სავალდებულოა)</small><input id="buyer_passport" autocomplete="off"></label>
 <label class="full">მისამართი<input id="buyer_address" placeholder="ქ. თბილისი, ..."></label>
@@ -94,22 +93,27 @@ function refresh(){const a=+$('area').value,p=+$('price_sqm').value;$('price_tot
 const msg=(t,c)=>{$('msg').className=c;$('msg').textContent=t};
 $('go').onclick=async()=>{
  const pre=V('type')==='preliminary',l=V('lang');
- const need=['buyer_name','apt','area','cadastral','price_sqm','price_total'].concat(pre?['init','months']:[]);
+ const need=['buyer_name','apt','area','cadastral','price_sqm','price_total'].concat(pre?['init','months','contract_no']:[]);
  if(need.some(i=>!V(i)))return msg('გთხოვ, შეავსო ყველა საჭირო ველი (მყიდველის სახელი და პირადი ნომერი, ბინა, ფართი, კადასტრი, ფასი'+(pre?', გრაფიკის ველები':'')+').','err');
  let rows=null;if(pre){rows=sched();if(!rows)return msg('გადახდის გრაფიკი ვერ დაითვალა: შეამოწმე პირველადი შენატანი (უნდა იყოს ჯამზე ნაკლები) და ვადა.','err')}
  const tot=+V('price_total'),sq=+V('price_sqm'),o={};
- ['contract_no','buyer_name','buyer_pn','buyer_passport','buyer_citizenship','buyer_address','buyer_phone','buyer_email','floor','apt','cadastral','seller_director','seller_pn','seller_address','seller_email','seller_phone','seller_iban'].forEach(i=>o[i]=V(i));
- Object.assign(o,{area:fmt(+V('area')),price_sqm:fmt(sq),price_total:fmt(tot),price_sqm_words:words(sq,l),price_total_words:words(tot,l),date:dmy(pd(V('date'))),schedule:rows||[]});
+ ['contract_no','buyer_name','buyer_pn','buyer_passport','buyer_address','buyer_phone','buyer_email','floor','apt','cadastral','seller_director','seller_pn','seller_address','seller_email','seller_phone','seller_iban'].forEach(i=>o[i]=V(i));
+ Object.assign(o,{buyer_citizenship:V('ctype')==='ge'?'საქართველო':'უცხოელი',area:fmt(+V('area')),price_sqm:fmt(sq),price_total:fmt(tot),price_sqm_words:words(sq,l),price_total_words:words(tot,l),date:dmy(pd(V('date'))),schedule:rows||[]});
  try{const r=await fetch(l+'_'+V('type')+'.docx');if(!r.ok)throw 404;
   const d=new docxtemplater(new PizZip(await r.arrayBuffer()),{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});d.render(o);
   const b=d.getZip().generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),a=document.createElement('a');
   a.href=URL.createObjectURL(b);a.download=l+'_'+V('type')+'_'+(V('apt')||'x')+'.docx';a.click();msg('მზადაა. ფაილი ჩამოიტვირთა.','ok')}
  catch(e){msg(e===404?'ამ ენის შაბლონი ჯერ არ არის დამატებული.':'შეცდომა გენერირებისას: '+(e.message||e),'err')}};
-function chk(){const ge=V('ctype')==='ge',pn=V('buyer_pn'),bad=ge&&pn.length>0&&pn.length!==11;let ok;
- if(ge)ok=pn.length===11;else ok=!!(pn||V('buyer_passport'));
- $('buyer_pn').classList.toggle('bad',bad);$('pnmsg').textContent=bad?'პირადი ნომერი უნდა იყოს ზუსტად 11 ციფრი (ჩაწერილია '+pn.length+')':'';$('go').disabled=!ok}
-$('buyer_pn').addEventListener('input',()=>{if(V('ctype')==='ge')$('buyer_pn').value=V('buyer_pn').replace(/\D/g,'').slice(0,11);chk()});
+const touched={};
+function chk(){const t=V('ctype'),ge=t==='ge',pn=V('buyer_pn'),pre=V('type')==='preliminary',badPn=ge&&pn.length>0&&pn.length!==11;let ok=true;
+ if(!t)ok=false;else if(ge){if(pn.length!==11)ok=false}else if(!(pn||V('buyer_passport')))ok=false;
+ if(pre&&!V('contract_no'))ok=false;
+ $('buyer_pn').classList.toggle('bad',badPn);$('pnmsg').textContent=badPn?'პირადი ნომერი უნდა იყოს ზუსტად 11 ციფრი (ჩაწერილია '+pn.length+')':'';
+ $('ctype').classList.toggle('bad',!t&&!!touched.ctype);$('contract_no').classList.toggle('bad',pre&&!V('contract_no')&&!!touched.no);$('go').disabled=!ok}
+$('buyer_pn').addEventListener('input',()=>{if(V('ctype')!=='foreign')$('buyer_pn').value=V('buyer_pn').replace(/\D/g,'').slice(0,11);chk()});
 $('buyer_passport').addEventListener('input',chk);
-$('ctype').addEventListener('input',()=>{const c=$('buyer_citizenship');if(V('ctype')==='foreign'){if(V('buyer_citizenship')==='საქართველო')c.value='';$('buyer_pn').maxLength=30}else{if(!V('buyer_citizenship'))c.value='საქართველო';$('buyer_pn').maxLength=11;$('buyer_pn').value=V('buyer_pn').replace(/\D/g,'').slice(0,11)}chk()});
+$('contract_no').addEventListener('input',()=>{touched.no=1;chk()});$('contract_no').addEventListener('blur',()=>{touched.no=1;chk()});
+$('ctype').addEventListener('blur',()=>{touched.ctype=1;chk()});$('type').addEventListener('input',chk);
+$('ctype').addEventListener('input',()=>{touched.ctype=1;$('buyer_pn').maxLength=V('ctype')==='foreign'?30:11;if(V('ctype')!=='foreign')$('buyer_pn').value=V('buyer_pn').replace(/\D/g,'').slice(0,11);chk()});
 refresh();chk();
 </script></body></html>
